@@ -2,10 +2,9 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
 import { parseAndValidate, jsonClone } from "./utils.mjs";
-import { GraphQLError } from "graphql";
 
-describe("depth limit", () => {
-  it("works", () => {
+describe("basics", () => {
+  it("friends^6", () => {
     const errors = parseAndValidate(
       /* GraphQL */ `
         query FoFoFoFoFoF {
