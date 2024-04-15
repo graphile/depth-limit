@@ -47,12 +47,13 @@ highly recommended that you only accept
 [trusted documents](https://benjie.dev/graphql/trusted-documents) to your
 GraphQL server - like Facebook do internally.
 
-If your server is intended to be consumed by third parties then you cannot rely
-on the security benefits of the Trusted Documents pattern, and thus you need to
-protect yourself from malicious queries. This rule is one very easy to use piece
-of protection (though you should note that it is not sufficient on its own, you
-should still use all the common patterns of protecting your API: rate limiting,
-circuit breakers, execution timeouts, enforcing pagination limits, etc etc).
+If your GraphQL API is intended to be consumed by untrusted (or not fully
+trusted) third parties then you cannot rely on the security benefits of the
+Trusted Documents pattern, and thus you need to protect yourself from malicious
+queries. This rule is one very easy to use piece of protection (though you
+should note that it is not sufficient on its own, you should still use all the
+common patterns of protecting your API: rate limiting, circuit breakers,
+execution timeouts, enforcing pagination limits, body size limits, etc etc).
 
 ### Do I need this if I am using Trusted Documents (aka persisted queries)?
 
