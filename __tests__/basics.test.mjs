@@ -7,10 +7,59 @@ import { parseAndValidate, jsonClone } from "./utils.mjs";
 const options = {
   maxListDepth: 5,
   maxDepth: 10,
+  maxSelfReferentialDepth: 20,
   revealDetails: true,
 };
 
 describe("basics", () => {
+  it("allows friends", () => {
+    const errors = parseAndValidate(
+      /* GraphQL */ `
+        query FoFoFoFoF {
+          currentUser {
+            friends {
+              name
+            }
+          }
+        }
+      `,
+      options,
+    );
+    assert.deepEqual(jsonClone(errors), []);
+  });
+
+  it("rejects friends^3 due to maxSelfReferentialDepth", () => {
+    const errors = parseAndValidate(
+      /* GraphQL */ `
+        query FoFoF {
+          currentUser {
+            friends {
+              friends {
+                friends {
+                  name
+                }
+              }
+            }
+          }
+        }
+      `,
+      { ...options, maxSelfReferentialDepth: 2 },
+    );
+    assert.deepEqual(jsonClone(errors), [
+      {
+        message:
+          "'FoFoF' exceeds operation depth limits: " +
+          "field User.friends nested 3 times which exceeds self referential maximum of 2.",
+        locations: [
+          {
+            line: 2,
+            column: 9,
+          },
+        ],
+      },
+    ]);
+  });
+
   it("allows friends^5", () => {
     const errors = parseAndValidate(
       /* GraphQL */ `
@@ -56,10 +105,7 @@ describe("basics", () => {
           }
         }
       `,
-      {
-        maxListDepth: 5,
-        revealDetails: true,
-      },
+      options,
     );
     assert.deepEqual(jsonClone(errors), [
       {
@@ -203,12 +249,14 @@ describe("basics", () => {
   it("supports custom limit", () => {
     const errors = parseAndValidate(
       /* GraphQL */ `
-        query FoFoF {
+        query FoFoFoF {
           currentUser {
             friends {
               friends {
                 friends {
-                  name
+                  friends {
+                    name
+                  }
                 }
               }
             }
@@ -218,16 +266,16 @@ describe("basics", () => {
       {
         ...options,
         maxDepthByFieldCoordinates: {
-          // Permit friends of friends, but don't allow going any deeper
-          "User.friends": 2,
+          // Permit friends of friends of friends, but don't allow going any deeper
+          "User.friends": 3,
         },
       },
     );
     assert.deepEqual(jsonClone(errors), [
       {
         message:
-          "'FoFoF' exceeds operation depth limits: " +
-          "field User.friends nested 3 times which exceeds maximum of 2.",
+          "'FoFoFoF' exceeds operation depth limits: " +
+          "field User.friends nested 4 times which exceeds maximum of 3.",
         locations: [
           {
             line: 2,

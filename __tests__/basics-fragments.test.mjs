@@ -5,8 +5,9 @@ import { parseAndValidate, jsonClone } from "./utils.mjs";
 
 /** @type {import("../dist/index.js").Options} */
 const options = {
-  maxListDepth: 5,
   maxDepth: 10,
+  maxListDepth: 5,
+  maxSelfReferentialDepth: 20,
   revealDetails: true,
 };
 
@@ -89,10 +90,7 @@ describe("basics-fragments", () => {
           }
         }
       `,
-      {
-        maxListDepth: 5,
-        revealDetails: true,
-      },
+      options,
     );
     assert.deepEqual(jsonClone(errors), [
       {

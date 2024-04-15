@@ -30,6 +30,8 @@ import {
 
 export { useDepthLimit } from "./envelop.js";
 
+export { Options };
+
 /**
  * Returns a GraphQL validation rule that can be used to limit the depth of a
  * GraphQL operation based on a number of settings.
@@ -64,15 +66,29 @@ export function depthLimit(options: Options = {}): ValidationRule {
             [],
             false,
           );
-          const { maxDepthByFieldCoordinates, revealDetails } = resolvedOptions;
+          const {
+            maxDepthByFieldCoordinates,
+            revealDetails,
+            maxSelfReferentialDepth,
+            maxIntrospectionSelfReferentialDepth,
+          } = resolvedOptions;
           const issues: string[] = [];
           for (const coordinate of Object.keys(depths)) {
+            const fallbackMaxScore = coordinate.includes(".")
+              ? coordinate.startsWith("__")
+                ? maxIntrospectionSelfReferentialDepth
+                : maxSelfReferentialDepth
+              : undefined;
+
             const score = depths[coordinate]!;
-            const maxScore = maxDepthByFieldCoordinates[coordinate];
+            const maxScore =
+              maxDepthByFieldCoordinates[coordinate] ?? fallbackMaxScore;
+            const isSelfReferential =
+              maxDepthByFieldCoordinates[coordinate] === undefined;
             if (maxScore !== undefined && score > maxScore) {
               if (coordinate.includes(".")) {
                 issues.push(
-                  `field ${coordinate} nested ${score} times which exceeds maximum of ${maxScore}`,
+                  `field ${coordinate} nested ${score} times which exceeds ${isSelfReferential ? "self referential " : ""}maximum of ${maxScore}`,
                 );
               } else {
                 switch (coordinate) {
@@ -131,8 +147,10 @@ function resolveOptions(options: Options = {}): Required<Options> {
   const {
     maxDepth = 12,
     maxListDepth = 4,
+    maxSelfReferentialDepth = 2,
     maxIntrospectionDepth = 12,
     maxIntrospectionListDepth = 3,
+    maxIntrospectionSelfReferentialDepth = 2,
     maxDepthByFieldCoordinates: userSpecifiedMaxDepthByFieldCoordinates,
     revealDetails = false,
     fragmentsAddToDepth = false,
@@ -145,7 +163,7 @@ function resolveOptions(options: Options = {}): Required<Options> {
       "__Type.fields": 1,
       "__Type.inputFields": 1,
       "__Type.interfaces": 1,
-      "__Type.ofType": 10,
+      "__Type.ofType": 8,
       "__Type.possibleTypes": 1,
       "__Field.args": 1,
       "__Field.type": 1,
@@ -159,8 +177,10 @@ function resolveOptions(options: Options = {}): Required<Options> {
   const resolvedOptions: Required<Options> = {
     maxDepth,
     maxListDepth,
+    maxSelfReferentialDepth,
     maxIntrospectionDepth,
     maxIntrospectionListDepth,
+    maxIntrospectionSelfReferentialDepth,
     maxDepthByFieldCoordinates: maxDepthByFieldCoordinates as Record<
       string,
       number

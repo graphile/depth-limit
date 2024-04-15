@@ -29,13 +29,6 @@ export type Options = {
   maxDepth?: number;
 
   /**
-   * How many selection sets deep may the user query in introspection?
-   *
-   * @defaultValue `12`
-   */
-  maxIntrospectionDepth?: number;
-
-  /**
    * How many nested lists deep may the user query?
    *
    * @defaultValue `4`
@@ -43,11 +36,38 @@ export type Options = {
   maxListDepth?: number;
 
   /**
+   * How many times may a field reference itself recursively by default. This
+   * is to try and block the most common forms of attack automatically, if you
+   * have legitimate cases where a field should be referenced recursively then
+   * you may specifically override those via `maxDepthByFieldCoordinates`.
+   *
+   * @defaultValue `2`
+   */
+  maxSelfReferentialDepth?: number;
+
+  /**
+   * How many selection sets deep may the user query in introspection?
+   *
+   * @defaultValue `12`
+   */
+  maxIntrospectionDepth?: number;
+
+  /**
    * How many nested lists deep may the user query in introspection?
    *
    * @defaultValue `3`
    */
   maxIntrospectionListDepth?: number;
+
+  /**
+   * How many times may an introspection field reference itself recursively by default. This
+   * is to try and block the most common forms of attack automatically, if you
+   * have legitimate cases where a field should be referenced recursively then
+   * you may specifically override those via `maxDepthByFieldCoordinates`.
+   *
+   * @defaultValue `2`
+   */
+  maxIntrospectionSelfReferentialDepth?: number;
 
   /**
    * Set `true` if you want fragments to add to the depth; not recommended.
