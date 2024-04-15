@@ -377,3 +377,11 @@ assert.deepEqual(depths, {
   "User.friends": 2,
 });
 ```
+
+## Caveats
+
+We count fields on their current named type whilst traversing the document; this
+type could be an object, interface, or union type. Therefore, a field that
+exists on an interface would be counted as a different coordinate depending on
+if the user accesses it via the interface directly or one of the
+implementations.
