@@ -313,7 +313,7 @@ export function maxDepth(options: Options = {}): ValidationRule {
               // a counter, and thus we can find the nth position in the stack.
               return context.reportError(
                 new GraphQLError(
-                  `'${operationName}' exceeds operation depth limits${revealDetails ? `: ${issues.join(", ")}` : ""}`,
+                  `'${operationName}' exceeds operation depth limits${revealDetails ? `: ${issues.join(", ")}` : ""}.`,
                   [operation],
                 ),
               );

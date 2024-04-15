@@ -38,3 +38,10 @@ export function parseAndValidate(operationText, options) {
   const errors = validate(schema, document, [rule]);
   return errors;
 }
+
+/**
+ * @param {any} obj
+ */
+export function jsonClone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}

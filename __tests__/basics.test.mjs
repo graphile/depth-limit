@@ -1,13 +1,14 @@
 // @ts-check
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { parseAndValidate } from "./utils.mjs";
+import { parseAndValidate, jsonClone } from "./utils.mjs";
+import { GraphQLError } from "graphql";
 
 describe("depth limit", () => {
   it("works", () => {
     const errors = parseAndValidate(
       /* GraphQL */ `
-        {
+        query FoFoFoFoFoF {
           currentUser {
             friends {
               friends {
@@ -27,8 +28,20 @@ describe("depth limit", () => {
       `,
       {
         maxListDepth: 5,
+        revealDetails: true,
       },
     );
-    assert.ok(errors.length > 0, "Expected an error");
+    assert.deepEqual(jsonClone(errors), [
+      {
+        message:
+          "'FoFoFoFoFoF' exceeds operation depth limits: operation list depth 6 exceeds maximum of 5.",
+        locations: [
+          {
+            line: 2,
+            column: 9,
+          },
+        ],
+      },
+    ]);
   });
 });
