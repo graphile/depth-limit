@@ -25,5 +25,13 @@
     "introspection"
   ],
   "author": "Benjie Gillam <code@benjiegillam.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "peerDependencies": {
+    "graphql": ">=15 <17"
+  },
+  "devDependencies": {
+    "graphql": "^15.8.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.5"
+  }
 }
