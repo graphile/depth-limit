@@ -73,10 +73,10 @@ Trusted Documents, to increase the limits as needed.
 
 ## Usage
 
-Install the module with your package manager of choice:
+Install the module (and `graphql`!) with your package manager of choice:
 
 ```
-yarn add @graphile/depth-limit
+yarn add graphql @graphile/depth-limit
 ```
 
 How you use it then depends on which server software you're using.
