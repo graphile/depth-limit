@@ -154,6 +154,52 @@ describe("basics", () => {
     ]);
   });
 
+  it("rejects self>otherSelf^5", () => {
+    const errors = parseAndValidate(
+      /* GraphQL */ `
+        query SelfOtherSelf5 {
+          currentUser {
+            self {
+              otherSelf {
+                self {
+                  otherSelf {
+                    self {
+                      otherSelf {
+                        self {
+                          otherSelf {
+                            self {
+                              otherSelf {
+                                name
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `,
+      options,
+    );
+    assert.deepEqual(jsonClone(errors), [
+      {
+        message:
+          "'SelfOtherSelf5' exceeds operation depth limits: " +
+          "operation depth 11 exceeds maximum of 10.",
+        locations: [
+          {
+            line: 2,
+            column: 9,
+          },
+        ],
+      },
+    ]);
+  });
+
   it("supports custom limit", () => {
     const errors = parseAndValidate(
       /* GraphQL */ `

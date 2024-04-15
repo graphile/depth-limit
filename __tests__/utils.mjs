@@ -10,6 +10,7 @@ export const schema = buildSchema(/* GraphQL */ `
     name: String
     "Same object again"
     self: User
+    otherSelf: User
     friends: [User!]!
     friendsConnection: UserConnection!
   }
