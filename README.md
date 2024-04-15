@@ -385,3 +385,13 @@ type could be an object, interface, or union type. Therefore, a field that
 exists on an interface would be counted as a different coordinate depending on
 if the user accesses it via the interface directly or one of the
 implementations.
+
+## See also
+
+This isn't the only depth limiting validation rule, others to check out are:
+
+- [`graphql-depth-limit`](https://www.npmjs.com/package/graphql-depth-limit) -
+  the OG depth limiter, last published 7 years ago and the repository no longer
+  exists
+- [`@escape.tech/graphql-armor-max-depth`](https://github.com/Escape-Technologies/graphql-armor/tree/main/packages/plugins/max-depth) -
+  a depth limiting plugin for the GraphQL Armor system
