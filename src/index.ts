@@ -80,21 +80,24 @@ export function maxDepth(options: Options = {}): ValidationRule {
     maxDepthByFieldCoordinates: userSpecifiedMaxDepthByFieldCoordinates,
     revealDetails = false,
   } = options;
-  const maxDepthByFieldCoordinates: DepthByCoordinate = {
-    "Query.__schema": 1,
-    "Query.__type": 1,
-    "__Type.fields": 1,
-    "__Type.inputFields": 1,
-    "__Type.interfaces": 1,
-    "__Type.ofType": 10,
-    "__Type.possibleTypes": 1,
-    "__Field.args": 1,
-    "__Field.type": 1,
-    ...userSpecifiedMaxDepthByFieldCoordinates,
-    [DEPTH]: maxDepth,
-    [INTROSPECTION_DEPTH]: maxIntrospectionDepth,
-    [LIST_DEPTH]: maxListDepth,
-  };
+  const maxDepthByFieldCoordinates: DepthByCoordinate = Object.assign(
+    Object.create(null),
+    {
+      "Query.__schema": 1,
+      "Query.__type": 1,
+      "__Type.fields": 1,
+      "__Type.inputFields": 1,
+      "__Type.interfaces": 1,
+      "__Type.ofType": 10,
+      "__Type.possibleTypes": 1,
+      "__Field.args": 1,
+      "__Field.type": 1,
+      ...userSpecifiedMaxDepthByFieldCoordinates,
+      [DEPTH]: maxDepth,
+      [INTROSPECTION_DEPTH]: maxIntrospectionDepth,
+      [LIST_DEPTH]: maxListDepth,
+    },
+  );
   return function (context) {
     const depthByFragment = new Map<string, Readonly<DepthByCoordinate>>();
     const countDepth = (
@@ -113,7 +116,7 @@ export function maxDepth(options: Options = {}): ValidationRule {
         case Kind.FIELD:
         case Kind.INLINE_FRAGMENT:
         case Kind.FRAGMENT_DEFINITION: {
-          const currentState: DepthByCoordinate = {};
+          const currentState: DepthByCoordinate = Object.create(null);
           if (node.kind === "Field") {
             const coordinate = `${currentType.name}.${node.name.value}`;
             incr(currentState, coordinate, 1);
@@ -139,7 +142,6 @@ export function maxDepth(options: Options = {}): ValidationRule {
                             ? TypeNameMetaFieldDef
                             : currentType.getFields()[node.name.value];
                     if (field) {
-                      // Once introspection, always introspection.
                       incr(currentState, LIST_DEPTH, listDepth(field.type));
                       return getNamedType(field.type);
                     } else {
@@ -169,6 +171,10 @@ export function maxDepth(options: Options = {}): ValidationRule {
               }
             })();
             if (type) {
+              const baseDepth = currentState[DEPTH] ?? 0;
+              const baseIntrospectionDepth =
+                currentState[INTROSPECTION_DEPTH] ?? 0;
+              const baseListDepth = currentState[LIST_DEPTH] ?? 0;
               for (const child of node.selectionSet.selections) {
                 const isIntrospectionField =
                   child.kind === Kind.FIELD &&
@@ -187,12 +193,19 @@ export function maxDepth(options: Options = {}): ValidationRule {
                 if (fieldCoord && !currentState[fieldCoord]) {
                   currentState[fieldCoord] = 1;
                 }
-                for (const coord in Object.keys(innerDepth)) {
+                for (const coord of Object.keys(innerDepth)) {
                   const score =
                     (innerDepth[coord] ?? 0) +
                     // Fields automatically add to depth
-                    (coord === fieldCoord ? 1 : 0);
-
+                    (coord === fieldCoord
+                      ? 1
+                      : coord === DEPTH
+                        ? baseDepth
+                        : coord === INTROSPECTION_DEPTH
+                          ? baseIntrospectionDepth
+                          : coord === LIST_DEPTH
+                            ? baseListDepth
+                            : 0);
                   // Only overwrite value if new score is higher
                   if (
                     currentState[coord] === undefined ||
