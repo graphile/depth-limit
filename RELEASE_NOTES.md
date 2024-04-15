@@ -1,5 +1,9 @@
 # Release notes
 
+## v0.3.0
+
+- Add the `countOperationDepths` helper function
+
 ## v0.2.0
 
 - Add the `maxSelfReferentialDepth` option

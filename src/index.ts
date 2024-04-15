@@ -11,13 +11,16 @@ import {
   Kind,
   OperationDefinitionNode,
   SchemaMetaFieldDef,
+  Source,
   TypeMetaFieldDef,
   TypeNameMetaFieldDef,
   ValidationRule,
+  buildSchema,
   getNamedType,
   isListType,
   isNonNullType,
   isObjectType,
+  parse,
 } from "graphql";
 import {
   Options,
@@ -447,4 +450,29 @@ function listDepth(type: GraphQLType) {
     }
   } while (t && d < 100);
   return d;
+}
+
+export function countOperationDepths(
+  schema: string | GraphQLSchema,
+  source: string | Source,
+  options: Options = {},
+) {
+  const actualSchema =
+    typeof schema === "string" ? buildSchema(schema) : schema;
+  const document = parse(source);
+  const operations = document.definitions.filter(
+    (d): d is OperationDefinitionNode => d.kind === Kind.OPERATION_DEFINITION,
+  );
+  const fragments = document.definitions.filter(
+    (d): d is FragmentDefinitionNode => d.kind === Kind.FRAGMENT_DEFINITION,
+  );
+  const result: {
+    [operationName: string]: Readonly<DepthByCoordinate>;
+  } = Object.create(null);
+  for (const operation of operations) {
+    const operationName = operation.name?.value ?? "";
+    const { depths } = countDepth(actualSchema, operation, fragments, options);
+    result[operationName] = depths;
+  }
+  return result;
 }

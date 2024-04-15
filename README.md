@@ -301,8 +301,8 @@ and `maxSelfReferentialDepth` (in that order).
 If you're starting from scratch you should set your settings low, and work your
 way up as you need to. If you have an existing server then it may make sense to
 track your queries for a while and figure out the higest values used (see the
-`countDepth` function below), and set your limits to that to prevent more
-complex queries.
+`countOperationDepths` function below), and set your limits to that to prevent
+more complex queries.
 
 Ultimately, tuning these parameters is more of an art than a science, and this
 is one reason why this validation rule isn't a built in feature of the `graphql`
@@ -374,6 +374,83 @@ without the support of my sponsors.
 \* _Other sponsorship methods are available, if you're interested drop me an
 email on my GitHub handle at graphile.com._
 
+## `countOperationDepths`
+
+This function returns the depths seen in a given document to help you to figure
+out what good values to set for your options are. Most options are ignored here,
+the main (only?) one that impacts the result of `depths` is
+`fragmentsAddToDepth`.
+
+Here you can provide both the schema SDL (or schema object) and the document
+source text. If you have already parsed the document then you may wish to use
+`countDepths` instead as it is more performant.
+
+```ts
+import { countOperationDepths } from "@graphile/depth-limit";
+
+const schema = /* GraphQL */ `
+  type Query {
+    currentUser: User
+  }
+  type User {
+    name: String
+    friends: [User!]!
+  }
+  type Mutation {
+    addFriend(id: ID!): AddFriendPayload
+  }
+  type AddFriendPayload {
+    query: Query
+  }
+`;
+
+const source = /* GraphQL */ `
+  query FriendsOfFriends {
+    ...FoF
+  }
+  mutation AddFriend($id: ID!) {
+    addFriend(id: $id) {
+      query {
+        ...FoF
+      }
+    }
+  }
+  fragment FoF on Query {
+    currentUser {
+      name
+      friends {
+        name
+        friends {
+          name
+        }
+      }
+    }
+  }
+`;
+
+const depthsByOperationName = countOperationDepths(schema, source);
+
+import assert from "assert";
+assert.deepEqual(depthsByOperationName, {
+  FriendsOfFriends: {
+    $$depth: 3,
+    $$listDepth: 2,
+    "Query.currentUser": 1,
+    "User.name": 1,
+    "User.friends": 2,
+  },
+  AddFriend: {
+    $$depth: 5,
+    $$listDepth: 2,
+    "Mutation.addFriend": 1,
+    "AddFriendPayload.query": 1,
+    "Query.currentUser": 1,
+    "User.name": 1,
+    "User.friends": 2,
+  },
+});
+```
+
 ## `countDepth`
 
 This function returns the depths seen in a given operation to help you to figure
@@ -382,8 +459,9 @@ the main (only?) one that impacts the result of `depths` is
 `fragmentsAddToDepth`.
 
 ```ts
+import assert from "assert";
 import { countDepth } from "@graphile/depth-limit";
-import { parse } from "graphql";
+import { parse, Kind, getOperationAST } from "graphql";
 import { schema } from "./schema.js";
 
 const query = /* GraphQL */ `
