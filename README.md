@@ -43,7 +43,7 @@ other Graphile software.
 GraphQL is a very powerful technology, but it must be handled carefully - it's
 relatively easy for a bad actor to write a small GraphQL query that causes the
 server to perform a disporportionaly large amount of work. For this reason, it's
-highly recommended that you only issue
+highly recommended that you only accept
 [trusted documents](https://benjie.dev/graphql/trusted-documents) to your
 GraphQL server - like Facebook do internally.
 
