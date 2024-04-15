@@ -60,17 +60,23 @@ export type Options = {
   maxIntrospectionListDepth?: number;
 
   /**
-   * How many times may an introspection field reference itself recursively by default. This
-   * is to try and block the most common forms of attack automatically, if you
-   * have legitimate cases where a field should be referenced recursively then
-   * you may specifically override those via `maxDepthByFieldCoordinates`.
+   * How many times may an introspection field reference itself recursively by
+   * default. This is to try and block the most common forms of attack
+   * automatically, if you have legitimate cases where a field should be
+   * referenced recursively then you may specifically override those via
+   * `maxDepthByFieldCoordinates`.
    *
    * @defaultValue `2`
    */
   maxIntrospectionSelfReferentialDepth?: number;
 
   /**
-   * Set `true` if you want fragments to add to the depth; not recommended.
+   * Set `true` if you want fragment spreads to add to the depth. Not
+   * recommended; fragments are essential to using GraphQL correctly so using
+   * them should not have a penalty.
+   *
+   * Whether this setting is true or false, the fields referenced by the
+   * fragment will still of course weigh into the depth calculations.
    *
    * @defaultValue `false`
    */

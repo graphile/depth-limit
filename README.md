@@ -6,12 +6,14 @@ protect your server from malicious operations.
 
 - Limits depth of field selections in an operation
 - Limits number of times a list may be nested in an operation
+- Limits number of times the same field coordinate may be (directly or
+  indirectly) nested
 - Has separate limits for introspection queries versus regular operations
-- Can choose whether or not fragments should add to the depth limit (default:
-  no)
 - Can add limits for specific fields to say how many times they may be nested
   (e.g. allow "friends of friends" but deny "friends of friends of friends" via
   `{'User.friends': 2}`)
+- Can be configured such that each fragment reference also increments the depth
+  (not recommended)
 
 ## FAQ
 
@@ -207,18 +209,28 @@ export type Options = {
   maxDepth?: number;
 
   /**
-   * How many selection sets deep may the user query in introspection?
-   *
-   * @defaultValue `12`
-   */
-  maxIntrospectionDepth?: number;
-
-  /**
    * How many nested lists deep may the user query?
    *
    * @defaultValue `4`
    */
   maxListDepth?: number;
+
+  /**
+   * How many times may a field reference itself recursively by default. This
+   * is to try and block the most common forms of attack automatically, if you
+   * have legitimate cases where a field should be referenced recursively then
+   * you may specifically override those via `maxDepthByFieldCoordinates`.
+   *
+   * @defaultValue `2`
+   */
+  maxSelfReferentialDepth?: number;
+
+  /**
+   * How many selection sets deep may the user query in introspection?
+   *
+   * @defaultValue `12`
+   */
+  maxIntrospectionDepth?: number;
 
   /**
    * How many nested lists deep may the user query in introspection?
@@ -228,7 +240,23 @@ export type Options = {
   maxIntrospectionListDepth?: number;
 
   /**
-   * Set `true` if you want fragments to add to the depth; not recommended.
+   * How many times may an introspection field reference itself recursively by
+   * default. This is to try and block the most common forms of attack
+   * automatically, if you have legitimate cases where a field should be
+   * referenced recursively then you may specifically override those via
+   * `maxDepthByFieldCoordinates`.
+   *
+   * @defaultValue `2`
+   */
+  maxIntrospectionSelfReferentialDepth?: number;
+
+  /**
+   * Set `true` if you want fragment spreads to add to the depth. Not
+   * recommended; fragments are essential to using GraphQL correctly so using
+   * them should not have a penalty.
+   *
+   * Whether this setting is true or false, the fields referenced by the
+   * fragment will still of course weigh into the depth calculations.
    *
    * @defaultValue `false`
    */
@@ -267,7 +295,8 @@ Firstly, we've set the introspection defaults to allow the most common
 introspection queries to pass validation, so you shouldn't need to customize
 those unless you're doing something fancy.
 
-The two main options you should look at customizing are `listDepth` and `depth`.
+The main options you should look at customizing are `maxListDepth`, `maxDepth`
+and `maxSelfReferentialDepth` (in that order).
 
 If you're starting from scratch you should set your settings low, and work your
 way up as you need to. If you have an existing server then it may make sense to
@@ -279,41 +308,53 @@ Ultimately, tuning these parameters is more of an art than a science, and this
 is one reason why this validation rule isn't a built in feature of the `graphql`
 module or, indeed, the specification.
 
-#### listDepth
+#### maxListDepth
 
-`listDepth` you should set to the lowest value you can tolerate; something like
-2, 3 or 4. It's unlikely that your users are successfully paginating through
-collections that are deeper than this. Note: listDepth only counts selection
-sets inside of lists, so scalar lists are ignored and do not add to the count,
-this is by design.
+`maxListDepth` you should set to the lowest value you can tolerate; something
+like 2, 3 or 4. It's unlikely that your users are successfully paginating
+through collections that are deeper than this. Note: `maxListDepth` only counts
+selection sets inside of lists, so scalar lists are ignored and do not add to
+the count, this is by design.
 
-#### depth
+#### maxDepth
 
-`depth` should also be set to a suitably low value, although it's much more
+`maxDepth` should also be set to a suitably low value, although it's much more
 acceptable to grow this one. One of the common introspection queries requires a
 depth of 12 (primarily due to `ofType { ofType { ofType { ... } } }` for
-determining the type of a field or argument), so this is the default we use, but
-lower would be better. Note that if your schema uses the Relay Cursor Connection
-pattern it may end up requiring deeper limits than you might realise.
+determining the type of a field or argument), so this is the default we use even
+for non-introspection queries; lower would be better, but higher is also fine if
+you need it. Note that if your schema uses the Relay Cursor Connection pattern
+it may end up requiring deeper limits than you might realise.
+
+#### maxSelfReferentialDepth
+
+`maxSelfReferentialDepth` defaults to just `2` and prevents attackers from
+exploiting cycles in your graph (e.g.
+`{ friends { friends { friends { ... } } } }`). We recommend that you keep this
+limit low, and then add specific overrides via `maxDepthByFieldCoordinates` if a
+particular field is expected to commonly be used in a nested fashion.
 
 #### maxDepthByFieldCoordinates
 
-If you have a particular cycle in your schema you would like to prevent people
-traversing too many times (for example you might have `User.friends` which
-returns `[User]`, and thus you could query it as
-`{ currentUser { friends { friends { friends { friends { ... } } } } } }`) then
-you can set specific limits on the number of times a particular field may be
-referenced recursively by specifying a numeric limit for its
-[schema coordinate](), for example:
+If you have a particular cycle in your schema (for example you might have
+`User.friends` which returns `[User]`, and thus you could query it as
+`{ currentUser { friends { friends { friends { friends { ... } } } } } }`) and
+you would like to prevent people nesting it too many times (or, alternatively,
+would like to allow them to nest it more than `maxSelfReferentialDepth` times)
+then you can set specific limits on the number of times a particular field may
+be referenced recursively by specifying a numeric limit for its
+[schema coordinate](https://github.com/graphql/graphql-wg/blob/main/rfcs/SchemaCoordinates.md#typeattribute),
+for example:
 
 ```ts
 import { depthLimit } from "@graphile/depth-limit";
 
 export const rule = depthLimit({
+  maxSelfReferentialDepth: 2,
   maxDepthByFieldCoordinates: {
-    // Allow `{ currentUser { friends { friends { name } } } }`
-    // But forbid `{ currentUser { friends { friends { friends { name } } } } }`
-    "User.friends": 2,
+    // Allow `{ currentUser { friends { friends { friends { name }  } } } }`
+    // But forbid `{ currentUser { friends { friends { friends { friends { name } } } } } }`
+    "User.friends": 3,
   },
 });
 ```
