@@ -8,12 +8,10 @@ export const schema = buildSchema(/* GraphQL */ `
   }
   type User {
     name: String
-    settings: UserSettings
+    "Same object again"
+    self: User
     friends: [User!]!
     friendsConnection: UserConnection!
-  }
-  type UserSettings {
-    sendNotifications: Boolean
   }
   type UserConnection {
     edges: [FriendEdge]!
