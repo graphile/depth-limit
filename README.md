@@ -127,9 +127,7 @@ const getEnveloped = envelop({
 ### Yoga
 
 With GraphQL Yoga, you'll follow a similar setup as with Envelop above; see the
-documentation on [Yoga
-plugins](https://the-guild.dev/graphql/yoga-server/docs/features/envelop-pluginll
-follow a similar setup as with Envelop above; see the documentation on
+documentation on
 [Yoga plugins](https://the-guild.dev/graphql/yoga-server/docs/features/envelop-plugins).
 
 ```ts
