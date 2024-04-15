@@ -120,9 +120,12 @@ export function maxDepth(options: Options = {}): ValidationRule {
         case Kind.INLINE_FRAGMENT:
         case Kind.FRAGMENT_DEFINITION: {
           const currentState: DepthByCoordinate = Object.create(null);
-          if (node.kind === "Field") {
-            const coordinate = `${currentType.name}.${node.name.value}`;
-            incr(currentState, coordinate, 1);
+          const currentFieldCoord =
+            node.kind === "Field"
+              ? `${currentType.name}.${node.name.value}`
+              : null;
+          if (currentFieldCoord) {
+            incr(currentState, currentFieldCoord, 1);
           }
 
           // Fields don't always have a selection set
@@ -180,6 +183,9 @@ export function maxDepth(options: Options = {}): ValidationRule {
               const baseIntrospectionDepth =
                 currentState[INTROSPECTION_DEPTH] ?? 0;
               const baseListDepth = currentState[LIST_DEPTH] ?? 0;
+              const baseCurrentFieldDepth = currentFieldCoord
+                ? currentState[currentFieldCoord] ?? 0
+                : 0;
               for (const child of node.selectionSet.selections) {
                 const isIntrospectionField =
                   child.kind === Kind.FIELD &&
@@ -202,8 +208,8 @@ export function maxDepth(options: Options = {}): ValidationRule {
                   const score =
                     (innerDepth[coord] ?? 0) +
                     // Fields automatically add to depth
-                    (coord === fieldCoord
-                      ? 1
+                    (coord === currentFieldCoord
+                      ? baseCurrentFieldDepth
                       : coord === DEPTH
                         ? baseDepth
                         : coord === INTROSPECTION_DEPTH
