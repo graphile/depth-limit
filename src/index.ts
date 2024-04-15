@@ -195,7 +195,7 @@ function fragmentsToMap(fragments: readonly FragmentDefinitionNode[]) {
 export function countDepth(
   schema: GraphQLSchema,
   operation: OperationDefinitionNode,
-  fragments: FragmentDefinitionNode[],
+  fragments: readonly FragmentDefinitionNode[],
   options: Options = {},
 ): {
   depths: Readonly<DepthByCoordinate>;
@@ -334,7 +334,7 @@ function countDepthInternal(
             );
             const fieldCoord =
               child.kind === Kind.FIELD
-                ? `${currentType.name}.${child.name.value}`
+                ? `${type.name}.${child.name.value}`
                 : null;
             if (fieldCoord && !currentState[fieldCoord]) {
               currentState[fieldCoord] = 1;
