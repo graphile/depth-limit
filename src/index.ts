@@ -21,6 +21,7 @@ import {
 const DEPTH = "$$depth";
 const INTROSPECTION_DEPTH = "$$introspectionDepth";
 const LIST_DEPTH = "$$listDepth";
+const INTROSPECTION_LIST_DEPTH = "$$introspectionListDepth";
 
 interface DepthByCoordinate {
   [DEPTH]?: number;
@@ -45,6 +46,8 @@ export type Options = {
   maxIntrospectionDepth?: number;
   /** How many nested lists deep may the user query? */
   maxListDepth?: number;
+  /** How many nested lists deep may the user query in introspection? */
+  maxIntrospectionListDepth?: number;
   /** Set `true` if you want fragments to add to the depth; not recommended. */
   fragmentsAddToDepth?: boolean;
   /**
@@ -79,6 +82,7 @@ export function maxDepth(options: Options = {}): ValidationRule {
     maxDepth = 12,
     maxListDepth = 4,
     maxIntrospectionDepth = 12,
+    maxIntrospectionListDepth = 3,
     maxDepthByFieldCoordinates: userSpecifiedMaxDepthByFieldCoordinates,
     revealDetails = false,
     fragmentsAddToDepth = false,
@@ -99,6 +103,7 @@ export function maxDepth(options: Options = {}): ValidationRule {
       [DEPTH]: maxDepth,
       [INTROSPECTION_DEPTH]: maxIntrospectionDepth,
       [LIST_DEPTH]: maxListDepth,
+      [INTROSPECTION_LIST_DEPTH]: maxIntrospectionListDepth,
     },
   );
   return function (context) {
@@ -112,7 +117,7 @@ export function maxDepth(options: Options = {}): ValidationRule {
         | FragmentSpreadNode
         | FragmentDefinitionNode,
       visitedFragments: ReadonlyArray<string>,
-      depthKey: typeof DEPTH | typeof INTROSPECTION_DEPTH,
+      isIntrospection: boolean,
     ): Readonly<DepthByCoordinate> => {
       switch (node.kind) {
         case Kind.OPERATION_DEFINITION:
@@ -131,7 +136,11 @@ export function maxDepth(options: Options = {}): ValidationRule {
           // Fields don't always have a selection set
           if (node.selectionSet) {
             if (fragmentsAddToDepth || node.kind === "Field") {
-              incr(currentState, depthKey, 1);
+              incr(
+                currentState,
+                isIntrospection ? INTROSPECTION_DEPTH : DEPTH,
+                1,
+              );
             }
             const type = (() => {
               switch (node.kind) {
@@ -150,7 +159,11 @@ export function maxDepth(options: Options = {}): ValidationRule {
                             ? TypeNameMetaFieldDef
                             : currentType.getFields()[node.name.value];
                     if (field) {
-                      incr(currentState, LIST_DEPTH, listDepth(field.type));
+                      incr(
+                        currentState,
+                        isIntrospection ? INTROSPECTION_LIST_DEPTH : LIST_DEPTH,
+                        listDepth(field.type),
+                      );
                       return getNamedType(field.type);
                     } else {
                       return null;
@@ -183,6 +196,8 @@ export function maxDepth(options: Options = {}): ValidationRule {
               const baseIntrospectionDepth =
                 currentState[INTROSPECTION_DEPTH] ?? 0;
               const baseListDepth = currentState[LIST_DEPTH] ?? 0;
+              const baseIntrospectionListDepth =
+                currentState[INTROSPECTION_LIST_DEPTH] ?? 0;
               const baseCurrentFieldDepth = currentFieldCoord
                 ? currentState[currentFieldCoord] ?? 0
                 : 0;
@@ -195,7 +210,7 @@ export function maxDepth(options: Options = {}): ValidationRule {
                   child,
                   visitedFragments,
                   // Once you go introspection, you can never go back
-                  isIntrospectionField ? INTROSPECTION_DEPTH : depthKey,
+                  isIntrospection || isIntrospectionField,
                 );
                 const fieldCoord =
                   child.kind === Kind.FIELD
@@ -216,7 +231,9 @@ export function maxDepth(options: Options = {}): ValidationRule {
                           ? baseIntrospectionDepth
                           : coord === LIST_DEPTH
                             ? baseListDepth
-                            : 0);
+                            : coord === INTROSPECTION_LIST_DEPTH
+                              ? baseIntrospectionListDepth
+                              : 0);
                   // Only overwrite value if new score is higher
                   if (
                     currentState[coord] === undefined ||
@@ -251,7 +268,7 @@ export function maxDepth(options: Options = {}): ValidationRule {
             currentType,
             fragment,
             [...visitedFragments, fragmentName],
-            depthKey,
+            isIntrospection,
           );
           depthByFragment.set(fragmentName, fragmentDepth);
           return fragmentDepth;
@@ -278,7 +295,7 @@ export function maxDepth(options: Options = {}): ValidationRule {
                   ? schema.getSubscriptionType()
                   : null;
           if (operationType) {
-            const depths = countDepth(operationType, operation, [], DEPTH);
+            const depths = countDepth(operationType, operation, [], false);
             const issues: string[] = [];
             for (const coordinate of Object.keys(depths)) {
               const score = depths[coordinate]!;
@@ -305,6 +322,12 @@ export function maxDepth(options: Options = {}): ValidationRule {
                     case LIST_DEPTH: {
                       issues.push(
                         `operation list depth ${score} exceeds maximum of ${maxScore}`,
+                      );
+                      break;
+                    }
+                    case INTROSPECTION_LIST_DEPTH: {
+                      issues.push(
+                        `operation introspection list depth ${score} exceeds maximum of ${maxScore}`,
                       );
                       break;
                     }
