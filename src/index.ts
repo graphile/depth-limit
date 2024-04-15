@@ -45,6 +45,8 @@ export type Options = {
   maxIntrospectionDepth?: number;
   /** How many nested lists deep may the user query? */
   maxListDepth?: number;
+  /** Set `true` if you want fragments to add to the depth; not recommended. */
+  fragmentsAddToDepth?: boolean;
   /**
    * Limits the number of times a particular field coordinate can be nested
    * inside itself; for example:
@@ -79,6 +81,7 @@ export function maxDepth(options: Options = {}): ValidationRule {
     maxIntrospectionDepth = 12,
     maxDepthByFieldCoordinates: userSpecifiedMaxDepthByFieldCoordinates,
     revealDetails = false,
+    fragmentsAddToDepth = false,
   } = options;
   const maxDepthByFieldCoordinates: DepthByCoordinate = Object.assign(
     Object.create(null),
@@ -124,7 +127,9 @@ export function maxDepth(options: Options = {}): ValidationRule {
 
           // Fields don't always have a selection set
           if (node.selectionSet) {
-            incr(currentState, depthKey, 1);
+            if (fragmentsAddToDepth || node.kind === "Field") {
+              incr(currentState, depthKey, 1);
+            }
             const type = (() => {
               switch (node.kind) {
                 case Kind.OPERATION_DEFINITION: {
