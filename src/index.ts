@@ -41,91 +41,81 @@ export function depthLimit(options: Options = {}): ValidationRule {
       // TODO: refactor this to use the existing visitors rather than recursing ourselves
       OperationDefinition: {
         enter(operation) {
-          const operationName = operation.name?.value ?? "(anonymous)";
-          // TODO: is this equivalent to context.getType()?
-          const operationType =
-            operation.operation === "query"
-              ? schema.getQueryType()
-              : operation.operation === "mutation"
-                ? schema.getMutationType()
-                : operation.operation === "subscription"
-                  ? schema.getSubscriptionType()
-                  : null;
-          if (operationType) {
-            const fragments = context
-              .getRecursivelyReferencedFragments(operation)
-              .reduce((memo, def) => {
-                memo[def.name.value] = def;
-                return memo;
-              }, Object.create(null));
+          const fragments = context
+            .getRecursivelyReferencedFragments(operation)
+            .reduce((memo, def) => {
+              memo[def.name.value] = def;
+              return memo;
+            }, Object.create(null));
 
-            const { depths, resolvedOptions } = countDepth(
-              schema,
-              fragments,
-              options,
-              operationType,
-              operation,
-              [],
-              depthByFragment,
-            );
-            const { maxDepthByFieldCoordinates, revealDetails } =
-              resolvedOptions;
-            const issues: string[] = [];
-            for (const coordinate of Object.keys(depths)) {
-              const score = depths[coordinate]!;
-              const maxScore = maxDepthByFieldCoordinates[coordinate];
-              if (maxScore !== undefined && score > maxScore) {
-                if (coordinate.includes(".")) {
-                  issues.push(
-                    `field ${coordinate} nested ${score} times which exceeds maximum of ${maxScore}`,
-                  );
-                } else {
-                  switch (coordinate) {
-                    case DEPTH: {
-                      issues.push(
-                        `operation depth ${score} exceeds maximum of ${maxScore}`,
-                      );
-                      break;
-                    }
-                    case INTROSPECTION_DEPTH: {
-                      issues.push(
-                        `operation introspection depth ${score} exceeds maximum of ${maxScore}`,
-                      );
-                      break;
-                    }
-                    case LIST_DEPTH: {
-                      issues.push(
-                        `operation list depth ${score} exceeds maximum of ${maxScore}`,
-                      );
-                      break;
-                    }
-                    case INTROSPECTION_LIST_DEPTH: {
-                      issues.push(
-                        `operation introspection list depth ${score} exceeds maximum of ${maxScore}`,
-                      );
-                      break;
-                    }
-                    default: {
-                      issues.push(
-                        `[internal error] coordinate '${coordinate}' not understood`,
-                      );
-                    }
+          const operationName = operation.name?.value ?? "(anonymous)";
+          const result = countDepth(
+            schema,
+            operation,
+            fragments,
+            options,
+            depthByFragment,
+          );
+          if (result == null) {
+            return;
+          }
+          const { depths, resolvedOptions } = result;
+          const { maxDepthByFieldCoordinates, revealDetails } = resolvedOptions;
+          const issues: string[] = [];
+          for (const coordinate of Object.keys(depths)) {
+            const score = depths[coordinate]!;
+            const maxScore = maxDepthByFieldCoordinates[coordinate];
+            if (maxScore !== undefined && score > maxScore) {
+              if (coordinate.includes(".")) {
+                issues.push(
+                  `field ${coordinate} nested ${score} times which exceeds maximum of ${maxScore}`,
+                );
+              } else {
+                switch (coordinate) {
+                  case DEPTH: {
+                    issues.push(
+                      `operation depth ${score} exceeds maximum of ${maxScore}`,
+                    );
+                    break;
+                  }
+                  case INTROSPECTION_DEPTH: {
+                    issues.push(
+                      `operation introspection depth ${score} exceeds maximum of ${maxScore}`,
+                    );
+                    break;
+                  }
+                  case LIST_DEPTH: {
+                    issues.push(
+                      `operation list depth ${score} exceeds maximum of ${maxScore}`,
+                    );
+                    break;
+                  }
+                  case INTROSPECTION_LIST_DEPTH: {
+                    issues.push(
+                      `operation introspection list depth ${score} exceeds maximum of ${maxScore}`,
+                    );
+                    break;
+                  }
+                  default: {
+                    issues.push(
+                      `[internal error] coordinate '${coordinate}' not understood`,
+                    );
                   }
                 }
               }
             }
-            if (issues.length > 0) {
-              // TODO: if revealDetails is true, we should indicate the nodes
-              // where the limit was exceeded. We could do so by building a
-              // "stack" of nodes adding to the limit, rather than incrementing
-              // a counter, and thus we can find the nth position in the stack.
-              return context.reportError(
-                new GraphQLError(
-                  `'${operationName}' exceeds operation depth limits${revealDetails ? `: ${issues.join(", ")}` : ""}.`,
-                  [operation],
-                ),
-              );
-            }
+          }
+          if (issues.length > 0) {
+            // TODO: if revealDetails is true, we should indicate the nodes
+            // where the limit was exceeded. We could do so by building a
+            // "stack" of nodes adding to the limit, rather than incrementing
+            // a counter, and thus we can find the nth position in the stack.
+            return context.reportError(
+              new GraphQLError(
+                `'${operationName}' exceeds operation depth limits${revealDetails ? `: ${issues.join(", ")}` : ""}.`,
+                [operation],
+              ),
+            );
           }
         },
       },
@@ -140,20 +130,7 @@ interface CountDepthContext {
   depthByFragment: Map<string, Readonly<DepthByCoordinate>>;
 }
 
-export function countDepth(
-  schema: GraphQLSchema,
-  fragments: Record<string, FragmentDefinitionNode>,
-  options: Options,
-  currentType: GraphQLNamedType,
-  node:
-    | OperationDefinitionNode
-    | FieldNode
-    | InlineFragmentNode
-    | FragmentSpreadNode
-    | FragmentDefinitionNode,
-  visitedFragments: ReadonlyArray<string>,
-  depthByFragment: Map<string, Readonly<DepthByCoordinate>> = new Map(),
-): { depths: Readonly<DepthByCoordinate>; resolvedOptions: Required<Options> } {
+function resolveOptions(options: Options = {}): Required<Options> {
   const {
     maxDepth = 12,
     maxListDepth = 4,
@@ -194,23 +171,43 @@ export function countDepth(
     revealDetails,
     fragmentsAddToDepth,
   };
+  return resolvedOptions;
+}
+
+export function countDepth(
+  schema: GraphQLSchema,
+  operation: OperationDefinitionNode,
+  fragments: Record<string, FragmentDefinitionNode>,
+  options: Options = {},
+  depthByFragment: Map<string, Readonly<DepthByCoordinate>> = new Map(),
+): {
+  depths: Readonly<DepthByCoordinate>;
+  resolvedOptions: Required<Options>;
+} | null {
+  const resolvedOptions = resolveOptions(options);
+  // TODO: is this equivalent to context.getType()?
+  const operationType =
+    operation.operation === "query"
+      ? schema.getQueryType()
+      : operation.operation === "mutation"
+        ? schema.getMutationType()
+        : operation.operation === "subscription"
+          ? schema.getSubscriptionType()
+          : null;
+  if (!operationType) {
+    return null;
+  }
   const ctx: CountDepthContext = {
     schema,
     fragments,
     options: resolvedOptions,
     depthByFragment,
   };
-  const depths = countDepthInner(
-    ctx,
-    currentType,
-    node,
-    visitedFragments,
-    false,
-  );
+  const depths = countDepthInternal(ctx, operationType, operation, [], false);
   return { depths, resolvedOptions };
 }
 
-function countDepthInner(
+function countDepthInternal(
   ctx: CountDepthContext,
   currentType: GraphQLNamedType,
   node:
@@ -302,7 +299,7 @@ function countDepthInner(
           for (const child of node.selectionSet.selections) {
             const isIntrospectionField =
               child.kind === Kind.FIELD && child.name.value.startsWith("__");
-            const innerDepth = countDepthInner(
+            const innerDepth = countDepthInternal(
               ctx,
               type,
               child,
@@ -362,7 +359,7 @@ function countDepthInner(
         // different validation rule.
         return {};
       }
-      const fragmentDepth = countDepthInner(
+      const fragmentDepth = countDepthInternal(
         ctx,
         currentType,
         fragment,
