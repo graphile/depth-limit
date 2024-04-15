@@ -62,6 +62,7 @@ export function depthLimit(options: Options = {}): ValidationRule {
     },
   );
   return function (context) {
+    const schema = context.getSchema();
     const depthByFragment = new Map<string, Readonly<DepthByCoordinate>>();
     const countDepth = (
       currentType: GraphQLNamedType,
@@ -128,17 +129,13 @@ export function depthLimit(options: Options = {}): ValidationRule {
                 }
                 case Kind.INLINE_FRAGMENT: {
                   if (node.typeCondition) {
-                    return context
-                      .getSchema()
-                      .getType(node.typeCondition.name.value);
+                    return schema.getType(node.typeCondition.name.value);
                   } else {
                     return currentType;
                   }
                 }
                 case Kind.FRAGMENT_DEFINITION: {
-                  return context
-                    .getSchema()
-                    .getType(node.typeCondition.name.value);
+                  return schema.getType(node.typeCondition.name.value);
                 }
                 default: {
                   const never: never = node;
@@ -239,7 +236,6 @@ export function depthLimit(options: Options = {}): ValidationRule {
       OperationDefinition: {
         enter(operation) {
           const operationName = operation.name?.value ?? "(anonymous)";
-          const schema = context.getSchema();
           // TODO: is this equivalent to context.getType()?
           const operationType =
             operation.operation === "query"
