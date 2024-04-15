@@ -4,6 +4,7 @@ import {
   FragmentSpreadNode,
   GraphQLError,
   GraphQLNamedType,
+  GraphQLSchema,
   GraphQLType,
   InlineFragmentNode,
   Kind,
@@ -33,204 +34,9 @@ export { useDepthLimit } from "./envelop.js";
  * GraphQL operation based on a number of settings.
  */
 export function depthLimit(options: Options = {}): ValidationRule {
-  const {
-    maxDepth = 12,
-    maxListDepth = 4,
-    maxIntrospectionDepth = 12,
-    maxIntrospectionListDepth = 3,
-    maxDepthByFieldCoordinates: userSpecifiedMaxDepthByFieldCoordinates,
-    revealDetails = false,
-    fragmentsAddToDepth = false,
-  } = options;
-  const maxDepthByFieldCoordinates: DepthByCoordinate = Object.assign(
-    Object.create(null),
-    {
-      "Query.__schema": 1,
-      "Query.__type": 1,
-      "__Type.fields": 1,
-      "__Type.inputFields": 1,
-      "__Type.interfaces": 1,
-      "__Type.ofType": 10,
-      "__Type.possibleTypes": 1,
-      "__Field.args": 1,
-      "__Field.type": 1,
-      ...userSpecifiedMaxDepthByFieldCoordinates,
-      [DEPTH]: maxDepth,
-      [INTROSPECTION_DEPTH]: maxIntrospectionDepth,
-      [LIST_DEPTH]: maxListDepth,
-      [INTROSPECTION_LIST_DEPTH]: maxIntrospectionListDepth,
-    },
-  );
   return function (context) {
     const schema = context.getSchema();
     const depthByFragment = new Map<string, Readonly<DepthByCoordinate>>();
-    const countDepth = (
-      currentType: GraphQLNamedType,
-      node:
-        | OperationDefinitionNode
-        | FieldNode
-        | InlineFragmentNode
-        | FragmentSpreadNode
-        | FragmentDefinitionNode,
-      visitedFragments: ReadonlyArray<string>,
-      isIntrospection: boolean,
-    ): Readonly<DepthByCoordinate> => {
-      switch (node.kind) {
-        case Kind.OPERATION_DEFINITION:
-        case Kind.FIELD:
-        case Kind.INLINE_FRAGMENT:
-        case Kind.FRAGMENT_DEFINITION: {
-          const currentState: DepthByCoordinate = Object.create(null);
-          const currentFieldCoord =
-            node.kind === "Field"
-              ? `${currentType.name}.${node.name.value}`
-              : null;
-          if (currentFieldCoord) {
-            incr(currentState, currentFieldCoord, 1);
-          }
-
-          // Fields don't always have a selection set
-          if (node.selectionSet) {
-            if (fragmentsAddToDepth || node.kind === "Field") {
-              incr(
-                currentState,
-                isIntrospection ? INTROSPECTION_DEPTH : DEPTH,
-                1,
-              );
-            }
-            const type = (() => {
-              switch (node.kind) {
-                case Kind.OPERATION_DEFINITION: {
-                  return currentType;
-                }
-                case Kind.FIELD: {
-                  if (isObjectType(currentType)) {
-                    const fieldName = node.name.value;
-                    const field =
-                      fieldName === "__type"
-                        ? TypeMetaFieldDef
-                        : fieldName === "__schema"
-                          ? SchemaMetaFieldDef
-                          : fieldName === "__typename"
-                            ? TypeNameMetaFieldDef
-                            : currentType.getFields()[node.name.value];
-                    if (field) {
-                      incr(
-                        currentState,
-                        isIntrospection ? INTROSPECTION_LIST_DEPTH : LIST_DEPTH,
-                        listDepth(field.type),
-                      );
-                      return getNamedType(field.type);
-                    } else {
-                      return null;
-                    }
-                  }
-                  break;
-                }
-                case Kind.INLINE_FRAGMENT: {
-                  if (node.typeCondition) {
-                    return schema.getType(node.typeCondition.name.value);
-                  } else {
-                    return currentType;
-                  }
-                }
-                case Kind.FRAGMENT_DEFINITION: {
-                  return schema.getType(node.typeCondition.name.value);
-                }
-                default: {
-                  const never: never = node;
-                  throw new Error(`Unhandled node kind ${(never as any).kind}`);
-                }
-              }
-            })();
-            if (type) {
-              const baseDepth = currentState[DEPTH] ?? 0;
-              const baseIntrospectionDepth =
-                currentState[INTROSPECTION_DEPTH] ?? 0;
-              const baseListDepth = currentState[LIST_DEPTH] ?? 0;
-              const baseIntrospectionListDepth =
-                currentState[INTROSPECTION_LIST_DEPTH] ?? 0;
-              const baseCurrentFieldDepth = currentFieldCoord
-                ? currentState[currentFieldCoord] ?? 0
-                : 0;
-              for (const child of node.selectionSet.selections) {
-                const isIntrospectionField =
-                  child.kind === Kind.FIELD &&
-                  child.name.value.startsWith("__");
-                const innerDepth = countDepth(
-                  type,
-                  child,
-                  visitedFragments,
-                  // Once you go introspection, you can never go back
-                  isIntrospection || isIntrospectionField,
-                );
-                const fieldCoord =
-                  child.kind === Kind.FIELD
-                    ? `${currentType.name}.${child.name.value}`
-                    : null;
-                if (fieldCoord && !currentState[fieldCoord]) {
-                  currentState[fieldCoord] = 1;
-                }
-                for (const coord of Object.keys(innerDepth)) {
-                  const score =
-                    (innerDepth[coord] ?? 0) +
-                    // Fields automatically add to depth
-                    (coord === currentFieldCoord
-                      ? baseCurrentFieldDepth
-                      : coord === DEPTH
-                        ? baseDepth
-                        : coord === INTROSPECTION_DEPTH
-                          ? baseIntrospectionDepth
-                          : coord === LIST_DEPTH
-                            ? baseListDepth
-                            : coord === INTROSPECTION_LIST_DEPTH
-                              ? baseIntrospectionListDepth
-                              : 0);
-                  // Only overwrite value if new score is higher
-                  if (
-                    currentState[coord] === undefined ||
-                    currentState[coord]! < score
-                  ) {
-                    currentState[coord] = score;
-                  }
-                }
-              }
-            }
-          }
-          return currentState;
-        }
-        case Kind.FRAGMENT_SPREAD: {
-          const fragmentName = node.name.value;
-          const existing = depthByFragment.get(fragmentName);
-          if (existing) {
-            return existing;
-          }
-          if (visitedFragments.includes(fragmentName)) {
-            // Recursion detected; this should be handled by a different
-            // validation rule.
-            return {};
-          }
-          const fragment = context.getFragment(fragmentName);
-          if (!fragment) {
-            // Non-existant fragment detected; this should be handled by a
-            // different validation rule.
-            return {};
-          }
-          const fragmentDepth = countDepth(
-            currentType,
-            fragment,
-            [...visitedFragments, fragmentName],
-            isIntrospection,
-          );
-          depthByFragment.set(fragmentName, fragmentDepth);
-          return fragmentDepth;
-        }
-        default: {
-          const never: never = node;
-          throw new Error(`Unexpected node type ${(never as any).kind}`);
-        }
-      }
-    };
     return {
       // TODO: refactor this to use the existing visitors rather than recursing ourselves
       OperationDefinition: {
@@ -246,7 +52,24 @@ export function depthLimit(options: Options = {}): ValidationRule {
                   ? schema.getSubscriptionType()
                   : null;
           if (operationType) {
-            const depths = countDepth(operationType, operation, [], false);
+            const fragments = context
+              .getRecursivelyReferencedFragments(operation)
+              .reduce((memo, def) => {
+                memo[def.name.value] = def;
+                return memo;
+              }, Object.create(null));
+
+            const { depths, resolvedOptions } = countDepth(
+              schema,
+              fragments,
+              options,
+              operationType,
+              operation,
+              [],
+              depthByFragment,
+            );
+            const { maxDepthByFieldCoordinates, revealDetails } =
+              resolvedOptions;
             const issues: string[] = [];
             for (const coordinate of Object.keys(depths)) {
               const score = depths[coordinate]!;
@@ -308,6 +131,252 @@ export function depthLimit(options: Options = {}): ValidationRule {
       },
     };
   };
+}
+
+interface CountDepthContext {
+  schema: GraphQLSchema;
+  fragments: Readonly<Record<string, FragmentDefinitionNode>>;
+  options: Required<Options>;
+  depthByFragment: Map<string, Readonly<DepthByCoordinate>>;
+}
+
+export function countDepth(
+  schema: GraphQLSchema,
+  fragments: Record<string, FragmentDefinitionNode>,
+  options: Options,
+  currentType: GraphQLNamedType,
+  node:
+    | OperationDefinitionNode
+    | FieldNode
+    | InlineFragmentNode
+    | FragmentSpreadNode
+    | FragmentDefinitionNode,
+  visitedFragments: ReadonlyArray<string>,
+  depthByFragment: Map<string, Readonly<DepthByCoordinate>> = new Map(),
+): { depths: Readonly<DepthByCoordinate>; resolvedOptions: Required<Options> } {
+  const {
+    maxDepth = 12,
+    maxListDepth = 4,
+    maxIntrospectionDepth = 12,
+    maxIntrospectionListDepth = 3,
+    maxDepthByFieldCoordinates: userSpecifiedMaxDepthByFieldCoordinates,
+    revealDetails = false,
+    fragmentsAddToDepth = false,
+  } = options;
+  const maxDepthByFieldCoordinates: DepthByCoordinate = Object.assign(
+    Object.create(null),
+    {
+      "Query.__schema": 1,
+      "Query.__type": 1,
+      "__Type.fields": 1,
+      "__Type.inputFields": 1,
+      "__Type.interfaces": 1,
+      "__Type.ofType": 10,
+      "__Type.possibleTypes": 1,
+      "__Field.args": 1,
+      "__Field.type": 1,
+      ...userSpecifiedMaxDepthByFieldCoordinates,
+      [DEPTH]: maxDepth,
+      [INTROSPECTION_DEPTH]: maxIntrospectionDepth,
+      [LIST_DEPTH]: maxListDepth,
+      [INTROSPECTION_LIST_DEPTH]: maxIntrospectionListDepth,
+    },
+  );
+  const resolvedOptions: Required<Options> = {
+    maxDepth,
+    maxListDepth,
+    maxIntrospectionDepth,
+    maxIntrospectionListDepth,
+    maxDepthByFieldCoordinates: maxDepthByFieldCoordinates as Record<
+      string,
+      number
+    >,
+    revealDetails,
+    fragmentsAddToDepth,
+  };
+  const ctx: CountDepthContext = {
+    schema,
+    fragments,
+    options: resolvedOptions,
+    depthByFragment,
+  };
+  const depths = countDepthInner(
+    ctx,
+    currentType,
+    node,
+    visitedFragments,
+    false,
+  );
+  return { depths, resolvedOptions };
+}
+
+function countDepthInner(
+  ctx: CountDepthContext,
+  currentType: GraphQLNamedType,
+  node:
+    | OperationDefinitionNode
+    | FieldNode
+    | InlineFragmentNode
+    | FragmentSpreadNode
+    | FragmentDefinitionNode,
+  visitedFragments: ReadonlyArray<string>,
+  isIntrospection: boolean,
+): Readonly<DepthByCoordinate> {
+  const {
+    schema,
+    fragments,
+    options: { fragmentsAddToDepth },
+    depthByFragment,
+  } = ctx;
+  switch (node.kind) {
+    case Kind.OPERATION_DEFINITION:
+    case Kind.FIELD:
+    case Kind.INLINE_FRAGMENT:
+    case Kind.FRAGMENT_DEFINITION: {
+      const currentState: DepthByCoordinate = Object.create(null);
+      const currentFieldCoord =
+        node.kind === "Field" ? `${currentType.name}.${node.name.value}` : null;
+      if (currentFieldCoord) {
+        incr(currentState, currentFieldCoord, 1);
+      }
+
+      // Fields don't always have a selection set
+      if (node.selectionSet) {
+        if (fragmentsAddToDepth || node.kind === "Field") {
+          incr(currentState, isIntrospection ? INTROSPECTION_DEPTH : DEPTH, 1);
+        }
+        const type = (() => {
+          switch (node.kind) {
+            case Kind.OPERATION_DEFINITION: {
+              return currentType;
+            }
+            case Kind.FIELD: {
+              if (isObjectType(currentType)) {
+                const fieldName = node.name.value;
+                const field =
+                  fieldName === "__type"
+                    ? TypeMetaFieldDef
+                    : fieldName === "__schema"
+                      ? SchemaMetaFieldDef
+                      : fieldName === "__typename"
+                        ? TypeNameMetaFieldDef
+                        : currentType.getFields()[node.name.value];
+                if (field) {
+                  incr(
+                    currentState,
+                    isIntrospection ? INTROSPECTION_LIST_DEPTH : LIST_DEPTH,
+                    listDepth(field.type),
+                  );
+                  return getNamedType(field.type);
+                } else {
+                  return null;
+                }
+              }
+              break;
+            }
+            case Kind.INLINE_FRAGMENT: {
+              if (node.typeCondition) {
+                return schema.getType(node.typeCondition.name.value);
+              } else {
+                return currentType;
+              }
+            }
+            case Kind.FRAGMENT_DEFINITION: {
+              return schema.getType(node.typeCondition.name.value);
+            }
+            default: {
+              const never: never = node;
+              throw new Error(`Unhandled node kind ${(never as any).kind}`);
+            }
+          }
+        })();
+        if (type) {
+          const baseDepth = currentState[DEPTH] ?? 0;
+          const baseIntrospectionDepth = currentState[INTROSPECTION_DEPTH] ?? 0;
+          const baseListDepth = currentState[LIST_DEPTH] ?? 0;
+          const baseIntrospectionListDepth =
+            currentState[INTROSPECTION_LIST_DEPTH] ?? 0;
+          const baseCurrentFieldDepth = currentFieldCoord
+            ? currentState[currentFieldCoord] ?? 0
+            : 0;
+          for (const child of node.selectionSet.selections) {
+            const isIntrospectionField =
+              child.kind === Kind.FIELD && child.name.value.startsWith("__");
+            const innerDepth = countDepthInner(
+              ctx,
+              type,
+              child,
+              visitedFragments,
+              // Once you go introspection, you can never go back
+              isIntrospection || isIntrospectionField,
+            );
+            const fieldCoord =
+              child.kind === Kind.FIELD
+                ? `${currentType.name}.${child.name.value}`
+                : null;
+            if (fieldCoord && !currentState[fieldCoord]) {
+              currentState[fieldCoord] = 1;
+            }
+            for (const coord of Object.keys(innerDepth)) {
+              const score =
+                (innerDepth[coord] ?? 0) +
+                // Fields automatically add to depth
+                (coord === currentFieldCoord
+                  ? baseCurrentFieldDepth
+                  : coord === DEPTH
+                    ? baseDepth
+                    : coord === INTROSPECTION_DEPTH
+                      ? baseIntrospectionDepth
+                      : coord === LIST_DEPTH
+                        ? baseListDepth
+                        : coord === INTROSPECTION_LIST_DEPTH
+                          ? baseIntrospectionListDepth
+                          : 0);
+              // Only overwrite value if new score is higher
+              if (
+                currentState[coord] === undefined ||
+                currentState[coord]! < score
+              ) {
+                currentState[coord] = score;
+              }
+            }
+          }
+        }
+      }
+      return currentState;
+    }
+    case Kind.FRAGMENT_SPREAD: {
+      const fragmentName = node.name.value;
+      const existing = depthByFragment.get(fragmentName);
+      if (existing) {
+        return existing;
+      }
+      if (visitedFragments.includes(fragmentName)) {
+        // Recursion detected; this should be handled by a different
+        // validation rule.
+        return {};
+      }
+      const fragment = fragments[fragmentName];
+      if (!fragment) {
+        // Non-existant fragment detected; this should be handled by a
+        // different validation rule.
+        return {};
+      }
+      const fragmentDepth = countDepthInner(
+        ctx,
+        currentType,
+        fragment,
+        [...visitedFragments, fragmentName],
+        isIntrospection,
+      );
+      depthByFragment.set(fragmentName, fragmentDepth);
+      return fragmentDepth;
+    }
+    default: {
+      const never: never = node;
+      throw new Error(`Unexpected node type ${(never as any).kind}`);
+    }
+  }
 }
 
 function incr(
