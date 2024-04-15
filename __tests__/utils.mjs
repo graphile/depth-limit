@@ -1,6 +1,6 @@
 // @ts-check
 import { buildSchema, parse, validate } from "graphql";
-import { maxDepth } from "../dist/index.js";
+import { depthLimit } from "../dist/index.js";
 
 export const schema = buildSchema(/* GraphQL */ `
   type Query {
@@ -33,7 +33,7 @@ export const schema = buildSchema(/* GraphQL */ `
  */
 export function parseAndValidate(operationText, options) {
   const document = parse(operationText);
-  const rule = maxDepth(options);
+  const rule = depthLimit(options);
   const errors = validate(schema, document, [rule]);
   return errors;
 }

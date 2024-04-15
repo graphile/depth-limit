@@ -77,7 +77,7 @@ export type Options = {
  * Returns a GraphQL validation rule that can be used to limit the depth of a
  * GraphQL operation based on a number of settings.
  */
-export function maxDepth(options: Options = {}): ValidationRule {
+export function depthLimit(options: Options = {}): ValidationRule {
   const {
     maxDepth = 12,
     maxListDepth = 4,
