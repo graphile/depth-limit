@@ -271,8 +271,9 @@ The two main options you should look at customizing are `listDepth` and `depth`.
 
 If you're starting from scratch you should set your settings low, and work your
 way up as you need to. If you have an existing server then it may make sense to
-track your queries for a while and figure out the higest values used, and set
-your limits to that to prevent more complex queries.
+track your queries for a while and figure out the higest values used (see the
+`countDepth` function below), and set your limits to that to prevent more
+complex queries.
 
 Ultimately, tuning these parameters is more of an art than a science, and this
 is one reason why this validation rule isn't a built in feature of the `graphql`
@@ -331,3 +332,48 @@ without the support of my sponsors.
 
 \* _Other sponsorship methods are available, if you're interested drop me an
 email on my GitHub handle at graphile.com._
+
+## `countDepth`
+
+This function returns the depths seen in a given operation to help you to figure
+out what good values to set for your options are. Most options are ignored here,
+the main (only?) one that impacts the result of `depths` is
+`fragmentsAddToDepth`.
+
+```ts
+import { countDepth } from "@graphile/depth-limit";
+import { parse } from "graphql";
+import { schema } from "./schema.js";
+
+const query = /* GraphQL */ `
+  query FriendsOfFriends {
+    currentUser {
+      name
+      friends {
+        name
+        friends {
+          name
+        }
+      }
+    }
+  }
+`;
+
+const document = parse(query);
+const operationName = undefined;
+const fragments = document.definitions.filter(
+  /** @type {(d: any) => d is import('graphql').FragmentDefinitionNode} */
+  (d) => d.kind === Kind.FRAGMENT_DEFINITION,
+);
+const operation = getOperationAST(document, operationName);
+const { depths, resolvedOptions } = countDepth(schema, operation, fragments, {
+  // Options here
+});
+assert.deepEqual(depths, {
+  $$depth: 3,
+  $$listDepth: 2,
+  "Query.currentUser": 1,
+  "User.name": 1,
+  "User.friends": 2,
+});
+```
