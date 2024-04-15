@@ -26,6 +26,8 @@ import {
   INTROSPECTION_LIST_DEPTH,
 } from "./interfaces.js";
 
+export { useDepthLimit } from "./envelop.js";
+
 /**
  * Returns a GraphQL validation rule that can be used to limit the depth of a
  * GraphQL operation based on a number of settings.

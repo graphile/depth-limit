@@ -31,6 +31,7 @@
     "graphql": ">=15 <17"
   },
   "devDependencies": {
+    "@envelop/core": "^5.0.0",
     "@tsconfig/node18": "^18.2.4",
     "@types/node": "^18.0.0",
     "graphql": "^15.8.0",
