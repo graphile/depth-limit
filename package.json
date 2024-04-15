@@ -1,6 +1,6 @@
 {
   "name": "@graphile/depth-limit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A validation rule to apply to GraphQL operations to avoid excessively deep queries.",
   "main": "dist/index.js",
   "scripts": {
