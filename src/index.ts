@@ -4,6 +4,7 @@ import {
   FragmentSpreadNode,
   GraphQLError,
   GraphQLNamedType,
+  GraphQLObjectType,
   GraphQLSchema,
   GraphQLType,
   InlineFragmentNode,
@@ -41,25 +42,28 @@ export function depthLimit(options: Options = {}): ValidationRule {
       // TODO: refactor this to use the existing visitors rather than recursing ourselves
       OperationDefinition: {
         enter(operation) {
-          const fragments = context
-            .getRecursivelyReferencedFragments(operation)
-            .reduce((memo, def) => {
-              memo[def.name.value] = def;
-              return memo;
-            }, Object.create(null));
-
           const operationName = operation.name?.value ?? "(anonymous)";
-          const result = countDepth(
+          const resolvedOptions = resolveOptions(options);
+          const ctx: CountDepthInternalContext = {
             schema,
-            operation,
-            fragments,
-            options,
+            fragments: fragmentsToMap(
+              context.getRecursivelyReferencedFragments(operation),
+            ),
+            options: resolvedOptions,
             depthByFragment,
-          );
-          if (result == null) {
+          };
+          // TODO: is this equivalent to context.getType()?
+          const operationType = getOperationType(schema, operation);
+          if (!operationType) {
             return;
           }
-          const { depths, resolvedOptions } = result;
+          const depths = countDepthInternal(
+            ctx,
+            operationType,
+            operation,
+            [],
+            false,
+          );
           const { maxDepthByFieldCoordinates, revealDetails } = resolvedOptions;
           const issues: string[] = [];
           for (const coordinate of Object.keys(depths)) {
@@ -123,13 +127,6 @@ export function depthLimit(options: Options = {}): ValidationRule {
   };
 }
 
-interface CountDepthContext {
-  schema: GraphQLSchema;
-  fragments: Readonly<Record<string, FragmentDefinitionNode>>;
-  options: Required<Options>;
-  depthByFragment: Map<string, Readonly<DepthByCoordinate>>;
-}
-
 function resolveOptions(options: Options = {}): Required<Options> {
   const {
     maxDepth = 12,
@@ -174,41 +171,69 @@ function resolveOptions(options: Options = {}): Required<Options> {
   return resolvedOptions;
 }
 
+function getOperationType(
+  schema: GraphQLSchema,
+  operation: OperationDefinitionNode,
+): GraphQLObjectType | null | undefined {
+  return operation.operation === "query"
+    ? schema.getQueryType()
+    : operation.operation === "mutation"
+      ? schema.getMutationType()
+      : operation.operation === "subscription"
+        ? schema.getSubscriptionType()
+        : null;
+}
+
+function fragmentsToMap(fragments: readonly FragmentDefinitionNode[]) {
+  const map = new Map<string, FragmentDefinitionNode>();
+  for (const def of fragments) {
+    map.set(def.name.value, def);
+  }
+  return map;
+}
+
 export function countDepth(
   schema: GraphQLSchema,
   operation: OperationDefinitionNode,
-  fragments: Record<string, FragmentDefinitionNode>,
+  fragments: FragmentDefinitionNode[],
   options: Options = {},
-  depthByFragment: Map<string, Readonly<DepthByCoordinate>> = new Map(),
 ): {
   depths: Readonly<DepthByCoordinate>;
   resolvedOptions: Required<Options>;
-} | null {
+} {
   const resolvedOptions = resolveOptions(options);
-  // TODO: is this equivalent to context.getType()?
-  const operationType =
-    operation.operation === "query"
-      ? schema.getQueryType()
-      : operation.operation === "mutation"
-        ? schema.getMutationType()
-        : operation.operation === "subscription"
-          ? schema.getSubscriptionType()
-          : null;
+  const operationType = getOperationType(schema, operation);
   if (!operationType) {
-    return null;
+    throw new Error(`Could not determine root type for operation`);
   }
-  const ctx: CountDepthContext = {
+  const fragmentMap = fragmentsToMap(fragments);
+  const ctx: CountDepthInternalContext = {
     schema,
-    fragments,
+    fragments: {
+      get(name) {
+        const frag = fragmentMap.get(name);
+        if (!frag) {
+          throw new Error(`Fragment '${name}' not found!`);
+        }
+        return frag;
+      },
+    },
     options: resolvedOptions,
-    depthByFragment,
+    depthByFragment: new Map(),
   };
   const depths = countDepthInternal(ctx, operationType, operation, [], false);
   return { depths, resolvedOptions };
 }
 
+interface CountDepthInternalContext {
+  schema: GraphQLSchema;
+  fragments: Pick<ReadonlyMap<string, FragmentDefinitionNode>, "get">;
+  options: Required<Options>;
+  depthByFragment: Map<string, Readonly<DepthByCoordinate>>;
+}
+
 function countDepthInternal(
-  ctx: CountDepthContext,
+  ctx: CountDepthInternalContext,
   currentType: GraphQLNamedType,
   node:
     | OperationDefinitionNode
@@ -353,7 +378,7 @@ function countDepthInternal(
         // validation rule.
         return {};
       }
-      const fragment = fragments[fragmentName];
+      const fragment = fragments.get(fragmentName);
       if (!fragment) {
         // Non-existant fragment detected; this should be handled by a
         // different validation rule.
