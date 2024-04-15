@@ -4,7 +4,8 @@
   "description": "A validation rule to apply to GraphQL operations to avoid excessively deep queries.",
   "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prepack": "tsc",
+    "test": "tsc && node --test"
   },
   "repository": {
     "type": "git",
@@ -30,6 +31,7 @@
     "graphql": ">=15 <17"
   },
   "devDependencies": {
+    "@tsconfig/node18": "^18.2.4",
     "graphql": "^15.8.0",
     "prettier": "^3.2.5",
     "typescript": "^5.4.5"
