@@ -1,0 +1,22 @@
+type Query {
+  currentUser: User
+}
+type User {
+  name: String
+  "Same object again"
+  self: User
+  otherSelf: User
+  friends: [User!]!
+  friendsConnection: UserConnection!
+}
+type UserConnection {
+  edges: [FriendEdge]!
+  pageInfo: PageInfo
+}
+type PageInfo {
+  hasNextPage: Boolean
+}
+type FriendEdge {
+  cursor: String!
+  node: User
+}
