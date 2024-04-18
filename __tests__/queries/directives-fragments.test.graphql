@@ -1,0 +1,34 @@
+query TestDirectivesFragments($true: Boolean = true, $false: Boolean = false) {
+  allPosts {
+    edges {
+      cursor
+      node {
+        author: personByAuthorId {
+          firstPost @include(if: $true) {
+            ...PostDetails
+          }
+          friends @skip(if: $false) {
+            nodes {
+              ...PersonDetails
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+fragment PersonDetails on Person {
+  id
+  name
+  firstName
+}
+
+fragment PostDetails on Post {
+  id
+  headline
+  headlineTrimmed
+  author: personByAuthorId {
+    ...PersonDetails
+  }
+}
