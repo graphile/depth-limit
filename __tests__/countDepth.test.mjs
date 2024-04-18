@@ -3,7 +3,7 @@ import { it } from "node:test";
 import assert from "node:assert";
 import { parse, Kind, getOperationAST } from "graphql";
 import { countDepth } from "../dist/index.js";
-import { schema } from "./utils.mjs";
+import { getSchema } from "./utils.mjs";
 
 const query = /* GraphQL */ `
   query FriendsOfFriends {
@@ -19,7 +19,7 @@ const query = /* GraphQL */ `
   }
 `;
 
-it("works as in README", () => {
+it("works as in README", async () => {
   const document = parse(query);
   const operationName = undefined;
   const fragments = document.definitions.filter(
@@ -32,6 +32,7 @@ it("works as in README", () => {
       `Could not determine operation, please check the operationName`,
     );
   }
+  const schema = await getSchema();
   const { depths, resolvedOptions } = countDepth(schema, operation, fragments, {
     // Options here
   });

@@ -9,8 +9,8 @@ const options = {
   revealDetails: true,
 };
 
-describe("mutations", () => {
-  it("Create mutations", () => {
+describe("mutation test", () => {
+  it("works with create mutations", () => {
     const errors = parseAndValidate(
       readFileSync(`${__dirname}/queries/mutation-create.test.graphql`, "utf8"),
       options,
@@ -18,7 +18,7 @@ describe("mutations", () => {
     );
     assert.deepEqual(jsonClone(errors), []);
   });
-  it("Delete mutations", () => {
+  it("works with delete mutations", () => {
     const errors = parseAndValidate(
       readFileSync(`${__dirname}/queries/mutation-delete.test.graphql`, "utf8"),
       options,
@@ -26,7 +26,7 @@ describe("mutations", () => {
     );
     assert.deepEqual(jsonClone(errors), []);
   });
-  it("Return type mutations", () => {
+  it("works with return type mutations", () => {
     const errors = parseAndValidate(
       readFileSync(
         `${__dirname}/queries/mutation-return-types.test.graphql`,
@@ -37,7 +37,7 @@ describe("mutations", () => {
     );
     assert.deepEqual(jsonClone(errors), []);
   });
-  it("Update mutations", () => {
+  it("works with update mutations", () => {
     const errors = parseAndValidate(
       readFileSync(`${__dirname}/queries/mutation-update.test.graphql`, "utf8"),
       options,

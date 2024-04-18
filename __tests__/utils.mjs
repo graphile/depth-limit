@@ -9,7 +9,7 @@ export const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /** @type {Map<string, import("graphql").GraphQLSchema>} */
 const schemaByFilename = new Map();
-function getSchema(schemaFilename = "simple.graphql") {
+export function getSchema(schemaFilename = "simple.graphql") {
   if (schemaByFilename.has(schemaFilename)) {
     return schemaByFilename.get(schemaFilename);
   }

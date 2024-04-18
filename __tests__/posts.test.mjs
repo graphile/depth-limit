@@ -9,8 +9,8 @@ const options = {
   revealDetails: true,
 };
 
-describe("posts", () => {
-  it("Fragments and aliases", () => {
+describe("posts test", () => {
+  it("Works with fragments and aliases", () => {
     const errors = parseAndValidate(
       readFileSync(`${__dirname}/queries/posts.test.graphql`, "utf8"),
       options,
