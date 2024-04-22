@@ -38,7 +38,6 @@
     "graphql": ">=15 <17"
   },
   "devDependencies": {
-    "@babel/eslint-parser": "^7.24.1",
     "@envelop/core": "^5.0.0",
     "@tsconfig/node18": "^18.2.4",
     "@types/node": "^18.0.0",
@@ -47,6 +46,7 @@
     "@typescript-eslint/typescript-estree": "^7.7.0",
     "eslint": "^8.48.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.28.1",
     "eslint-plugin-simple-import-sort": "^12.1.0",
     "eslint-plugin-tsdoc": "^0.2.17",
     "graphql": "^15.8.0",
