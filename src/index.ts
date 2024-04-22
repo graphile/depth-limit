@@ -1,34 +1,37 @@
-import {
+import type {
   FieldNode,
   FragmentDefinitionNode,
   FragmentSpreadNode,
-  GraphQLError,
   GraphQLNamedType,
   GraphQLObjectType,
   GraphQLSchema,
   GraphQLType,
   InlineFragmentNode,
-  Kind,
   OperationDefinitionNode,
-  SchemaMetaFieldDef,
   Source,
-  TypeMetaFieldDef,
-  TypeNameMetaFieldDef,
   ValidationRule,
+} from "graphql";
+import {
   buildSchema,
   getNamedType,
+  GraphQLError,
   isListType,
   isNonNullType,
   isObjectType,
+  Kind,
   parse,
+  SchemaMetaFieldDef,
+  TypeMetaFieldDef,
+  TypeNameMetaFieldDef,
 } from "graphql";
+
+import type { DepthByCoordinate } from "./interfaces.js";
 import {
-  Options,
-  DepthByCoordinate,
   DEPTH,
   INTROSPECTION_DEPTH,
-  LIST_DEPTH,
   INTROSPECTION_LIST_DEPTH,
+  LIST_DEPTH,
+  Options,
 } from "./interfaces.js";
 
 export { useDepthLimit } from "./envelop.js";

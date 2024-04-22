@@ -5,7 +5,14 @@
   "main": "dist/index.js",
   "scripts": {
     "prepack": "tsc",
-    "test": "tsc && node --test"
+    "test": "tsc && node --test",
+    "lint": "yarn run eslint . && yarn prettier:check",
+    "lint:fix": "yarn run eslint --fix . && yarn prettier:fix",
+    "eslint": "eslint --ext .js,.jsx,.ts,.tsx",
+    "prettier": "prettier --cache --ignore-path ./.eslintignore",
+    "prettier:all": "yarn prettier '**/*.{json,md,mdx,html,js,jsx,ts,tsx,yml}'",
+    "prettier:fix": "yarn prettier:all --write",
+    "prettier:check": "yarn prettier:all --list-different"
   },
   "repository": {
     "type": "git",
@@ -34,6 +41,14 @@
     "@envelop/core": "^5.0.0",
     "@tsconfig/node18": "^18.2.4",
     "@types/node": "^18.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.7.0",
+    "@typescript-eslint/parser": "^7.7.0",
+    "@typescript-eslint/typescript-estree": "^7.7.0",
+    "eslint": "^8.48.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.28.1",
+    "eslint-plugin-simple-import-sort": "^12.1.0",
+    "eslint-plugin-tsdoc": "^0.2.17",
     "graphql": "^15.8.0",
     "prettier": "^3.2.5",
     "typescript": "^5.4.5"
