@@ -27,6 +27,8 @@ describe("doesn't die on invalid queries", () => {
         }
       `,
       options,
+      "simple.graphql",
+      true,
     );
     assert.deepEqual(jsonClone(errors), []);
   });
@@ -65,6 +67,8 @@ describe("doesn't die on invalid queries", () => {
         }
       `,
       options,
+      "simple.graphql",
+      true,
     );
     assert.deepEqual(jsonClone(errors), []);
   });
@@ -104,6 +108,8 @@ describe("doesn't die on invalid queries", () => {
         }
       `,
       options,
+      "simple.graphql",
+      true,
     );
     assert.deepEqual(jsonClone(errors), []);
   });
@@ -143,6 +149,8 @@ describe("doesn't die on invalid queries", () => {
         }
       `,
       options,
+      "simple.graphql",
+      true,
     );
     assert.deepEqual(jsonClone(errors), []);
   });

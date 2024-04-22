@@ -1,0 +1,22 @@
+query TestDirectivesAdditional($true: Boolean = true, $false: Boolean = false) {
+  allPosts {
+    edges {
+      cursor
+      node {
+        author: personByAuthorId {
+          firstPost @include(if: $true) {
+            id
+            headline
+          }
+          friends @skip(if: $false) {
+            nodes {
+              id
+              name
+              firstName
+            }
+          }
+        }
+      }
+    }
+  }
+}
