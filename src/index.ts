@@ -36,7 +36,7 @@ import {
 
 export { useDepthLimit } from "./envelop.js";
 
-export { Options };
+export { DepthByCoordinate, Options };
 
 /**
  * Returns a GraphQL validation rule that can be used to limit the depth of a
