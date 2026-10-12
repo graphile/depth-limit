@@ -1,2 +1,9 @@
-node_modules/
+/node_modules/
 /dist
+/.yarn/
+!/.yarn/releases
+!/.yarn/releases/*
+!/.yarn/plugins
+!/.yarn/plugins/*
+!/.yarn/patches
+!/.yarn/patches/*

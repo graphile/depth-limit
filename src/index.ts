@@ -23,6 +23,7 @@ import {
   SchemaMetaFieldDef,
   TypeMetaFieldDef,
   TypeNameMetaFieldDef,
+  versionInfo,
 } from "graphql";
 
 import type { DepthByCoordinate } from "./interfaces.js";
@@ -139,7 +140,9 @@ export function depthLimit(options: Options = {}): ValidationRule {
             return context.reportError(
               new GraphQLError(
                 `'${operationName}' exceeds operation depth limits${revealDetails ? `: ${issues.join(", ")}` : ""}.`,
-                [operation],
+                versionInfo.major >= 16
+                  ? { nodes: [operation] }
+                  : ([operation] as never),
               ),
             );
           }
@@ -154,7 +157,7 @@ function resolveOptions(options: Options = {}): Required<Options> {
     maxDepth = 12,
     maxListDepth = 4,
     maxSelfReferentialDepth = 2,
-    maxIntrospectionDepth = 12,
+    maxIntrospectionDepth = 14,
     maxIntrospectionListDepth = 3,
     maxIntrospectionSelfReferentialDepth = 2,
     maxDepthByFieldCoordinates: userSpecifiedMaxDepthByFieldCoordinates,
@@ -169,7 +172,7 @@ function resolveOptions(options: Options = {}): Required<Options> {
       "__Type.fields": 1,
       "__Type.inputFields": 1,
       "__Type.interfaces": 1,
-      "__Type.ofType": 8,
+      "__Type.ofType": 9,
       "__Type.possibleTypes": 1,
       "__Field.args": 1,
       "__Field.type": 1,
